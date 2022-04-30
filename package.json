@@ -3,14 +3,14 @@
     "@vitalets/google-translate-api": "^8.0.0",
     "dotenv": "^16.0.0",
     "node-cron": "^3.0.0",
-    "telegraf": "^4.7.0"
+    "telegraf": "^4.7.0",
+    "deepai": "^1.0.21"
   },
   "scripts": {
     "start": "node bot.js",
     "dev": "nodemon bot.js"
   },
   "devDependencies": {
-    "deepai": "^1.0.21",
     "nodemon": "^2.0.16"
   }
 }
