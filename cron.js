@@ -1,9 +1,9 @@
 const cron = require("cron");
 const https = require("https");
 
-const backendUrl = "https://coolstory-teller.onrender.com";
+const backendUrl = "https://coolstory-teller.onrender.com/healthz";
 
-const job = new cron.CronJob("*/14 * * * *", function () {
+const job = new cron.CronJob("*/16 * * * *", function () {
   console.log("CRON: restaring server");
   https
     .get(backendUrl, (res) => {

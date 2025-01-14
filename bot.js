@@ -26,8 +26,26 @@ const getUserMood = (ctx) => ctx.session.mood || initialMood;
 const setUserMood = (ctx, mood) => (ctx.session.mood = mood);
 let moodChangeInProcess = false;
 
+const getUserMessages = (ctx) => {
+  if (!ctx.session.messages) {
+    ctx.session.messages = [];
+  }
+  return ctx.session.messages.map((message) => ({
+    role: "user",
+    content: message,
+  }));
+};
+const setUserMessages = (ctx, message) => {
+  ctx.session.messages.push(message);
+
+  if (ctx.session.messages.length > 10) {
+    ctx.session.messages.shift();
+  }
+};
+
 async function getGroqChatCompletion(ctx, userInput) {
   const mood = getUserMood(ctx);
+  const cachedMessages = getUserMessages(ctx);
   try {
     const completion = await groq.chat.completions.create({
       messages: [
@@ -35,6 +53,7 @@ async function getGroqChatCompletion(ctx, userInput) {
           role: "system",
           content: mood,
         },
+        ...cachedMessages,
         {
           role: "user",
           content: userInput,
@@ -80,6 +99,8 @@ bot.on("text", (ctx) => {
 
     const response = await getGroqChatCompletion(ctx, userInput);
 
+    setUserMessages(ctx, userInput);
+
     console.log(response, "response");
     if (!response) {
       console.error("No response");
@@ -103,7 +124,10 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
 
-job.start();
+const sixteenMinutes = 1000 * 60 * 16;
+setTimeout(() => {
+  job.start();
+}, sixteenMinutes);
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
