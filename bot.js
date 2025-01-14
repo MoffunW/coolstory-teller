@@ -8,6 +8,9 @@ const groq = new Groq({
 });
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
+let mood =
+  "Ты рассказчик бредовых историй, я отправляю тебе текст как начало истории, а ты её продолжаешь в манере нонсенс";
+
 async function getGroqChatCompletion(userInput) {
   console.log(userInput);
   try {
@@ -15,8 +18,7 @@ async function getGroqChatCompletion(userInput) {
       messages: [
         {
           role: "system",
-          content:
-            "Ты рассказчик бредовых историй, я отправляю тебе текст как начало истории, а ты её продолжаешь в манере нонсенс",
+          content: mood,
         },
         {
           role: "user",
@@ -32,6 +34,17 @@ async function getGroqChatCompletion(userInput) {
   }
 }
 
+bot.command("mood", (ctx) => {
+  ctx.reply("Введите новое настроение для бота:");
+
+  // Переход в режим ожидания сообщения пользователя
+  bot.on("text", async (ctxReply) => {
+    const newMood = ctxReply.message.text;
+    mood = newMood; // Обновляем переменную mood
+    ctxReply.reply(`Новое настроение установлено: "${mood}"`);
+    bot.removeTextListener(); // Удаляем обработчик, чтобы не перезаписывать настроение случайно
+  });
+});
 bot.on("sticker", (ctx) => ctx.reply("👍"));
 bot.on("text", (ctx) => {
   (async function () {
