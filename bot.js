@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { Telegraf } = require("telegraf");
+const { Telegraf, session } = require("telegraf");
 const { Groq } = require("groq-sdk");
 
 const groq = new Groq({
@@ -8,13 +8,23 @@ const groq = new Groq({
 });
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-let mood =
+bot.use(session());
+
+bot.use((ctx, next) => {
+  if (!ctx.session) {
+    ctx.session = {}; // Инициализация пустой сессии
+  }
+  return next();
+});
+
+const initialMood =
   "Ты рассказчик бредовых историй, я отправляю тебе текст как начало истории, а ты её продолжаешь в манере нонсенс";
-const initialMood = mood;
+const getUserMood = (ctx) => ctx.session.mood || initialMood;
+const setUserMood = (ctx, mood) => (ctx.session.mood = mood);
 let moodChangeInProcess = false;
 
-async function getGroqChatCompletion(userInput) {
-  console.log(userInput);
+async function getGroqChatCompletion(ctx, userInput) {
+  const mood = getUserMood(ctx);
   try {
     const completion = await groq.chat.completions.create({
       messages: [
@@ -35,46 +45,37 @@ async function getGroqChatCompletion(userInput) {
     console.error(error);
   }
 }
-
-const commands = {
-  cancel: "cancel",
-  mood: "mood",
-  current: "current",
-};
-
-bot.command(commands.current, (ctx) => {
-  ctx.reply(`Текущие настройки:\n ${mood}`);
+bot.command("current", (ctx) => {
+  ctx.reply(`Текущие настройки:\n ${getUserMood(ctx)}`);
 });
-bot.command(commands.cancel, (ctx) => {
+bot.command("cancel", (ctx) => {
   moodChangeInProcess = true;
-  mood = initialMood;
+  setUserMood(ctx, initialMood);
   ctx.reply(`Настроение сброшено до базовых.\nТекущие настройки:\n ${mood}`);
   moodChangeInProcess = false;
 });
-bot.command(commands.mood, (ctx) => {
+bot.command("mood", (ctx) => {
   ctx.reply("Введите новое настроение для бота:");
   moodChangeInProcess = true;
 });
 
 bot.on("text", (ctx) => {
   const userInput = ctx.message.text;
-  const isCommand = Object.values(commands).some(
-    (command) => `/${command}` === userInput,
-  );
 
-  if (isCommand) return;
+  if (userInput.startsWith("/")) return;
 
   if (moodChangeInProcess) {
-    mood = userInput;
+    setUserMood(ctx, userInput);
     moodChangeInProcess = false;
-    ctx.reply(`Новое настроение установлено:\n "${mood}"`);
+
+    ctx.reply(`Новое настроение установлено:\n "${userInput}"`);
     return;
   }
 
   (async function () {
     console.log(userInput, "input");
 
-    const response = await getGroqChatCompletion(userInput);
+    const response = await getGroqChatCompletion(ctx, userInput);
 
     console.log(response, "response");
     if (!response) {
