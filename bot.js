@@ -3,6 +3,7 @@ require("dotenv").config();
 const { Telegraf, session } = require("telegraf");
 const { Groq } = require("groq-sdk");
 const express = require("express");
+const { interleaveArrays } = require("./utils.js");
 const job = require("./cron.js").job;
 
 const groq = new Groq({
@@ -15,7 +16,12 @@ bot.use(session());
 
 bot.use((ctx, next) => {
   if (!ctx.session) {
-    ctx.session = {}; // Инициализация пустой сессии
+    ctx.session = {
+      messages: {
+        user: [],
+        system: [],
+      },
+    }; // Инициализация пустой сессии
   }
   return next();
 });
@@ -26,26 +32,47 @@ const getUserMood = (ctx) => ctx.session.mood || initialMood;
 const setUserMood = (ctx, mood) => (ctx.session.mood = mood);
 let moodChangeInProcess = false;
 
-const getUserMessages = (ctx) => {
-  if (!ctx.session.messages) {
-    ctx.session.messages = [];
+const roles = {
+  system: "system",
+  user: "user",
+};
+
+const setMessages = (ctx, role, message) => {
+  if (!ctx || !role || !message) {
+    console.error("Required 3 params");
+    return;
   }
-  return ctx.session.messages.map((message) => ({
-    role: "user",
+  const cached = ctx.session.messages[role];
+
+  cached.push(message);
+
+  if (cached.length > 10) cached.shift();
+};
+
+const getMessages = (ctx, role) => {
+  if (!ctx || role) {
+    console.error("Required 3 params");
+    return;
+  }
+  const cached = ctx.session.messages[role];
+
+  if (!cached) cached = [];
+
+  return cached.map((message) => ({
+    role: role,
     content: message,
   }));
-};
-const setUserMessages = (ctx, message) => {
-  ctx.session.messages.push(message);
-
-  if (ctx.session.messages.length > 10) {
-    ctx.session.messages.shift();
-  }
 };
 
 async function getGroqChatCompletion(ctx, userInput) {
   const mood = getUserMood(ctx);
-  const cachedMessages = getUserMessages(ctx);
+  const cachedUserMessages = getMessages(ctx, roles.user);
+  const cachedSystemMessages = getMessages(ctx, roles.system);
+  const dialogInOrder = interleaveArrays(
+    cachedUserMessages,
+    cachedSystemMessages,
+  );
+
   try {
     const completion = await groq.chat.completions.create({
       messages: [
@@ -53,7 +80,7 @@ async function getGroqChatCompletion(ctx, userInput) {
           role: "system",
           content: mood,
         },
-        ...cachedMessages,
+        ...dialogInOrder,
         {
           role: "user",
           content: userInput,
@@ -99,7 +126,7 @@ bot.on("text", (ctx) => {
 
     const response = await getGroqChatCompletion(ctx, userInput);
 
-    setUserMessages(ctx, userInput);
+    setMessages(ctx, roles.user, userInput);
 
     console.log(response, "response");
     if (!response) {
@@ -107,6 +134,7 @@ bot.on("text", (ctx) => {
       return;
     }
     ctx.reply(response);
+    setMessages(ctx, roles.system, response);
   })();
 });
 
