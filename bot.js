@@ -1,6 +1,9 @@
 require("dotenv").config();
+
 const { Telegraf, session } = require("telegraf");
 const { Groq } = require("groq-sdk");
+const express = require("express");
+const job = require("./cron.js").job;
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -89,6 +92,18 @@ bot.on("text", (ctx) => {
 bot.on("sticker", (ctx) => ctx.reply("👍"));
 
 bot.launch();
+const app = express();
+const port = process.env.PORT || 4000;
+
+app.get("/", (req, res) => {
+  res.send("Hello World!");
+});
+
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`);
+});
+
+job.start();
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
