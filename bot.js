@@ -10,6 +10,8 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 let mood =
   "Ты рассказчик бредовых историй, я отправляю тебе текст как начало истории, а ты её продолжаешь в манере нонсенс";
+const initialMood = mood;
+let moodChangeInProcess = false;
 
 async function getGroqChatCompletion(userInput) {
   console.log(userInput);
@@ -34,30 +36,56 @@ async function getGroqChatCompletion(userInput) {
   }
 }
 
-bot.command("mood", (ctx) => {
-  ctx.reply("Введите новое настроение для бота:");
+const commands = {
+  cancel: "cancel",
+  mood: "mood",
+  current: "current",
+};
 
-  // Переход в режим ожидания сообщения пользователя
-  bot.on("text", async (ctxReply) => {
-    const newMood = ctxReply.message.text;
-    mood = newMood; // Обновляем переменную mood
-    ctxReply.reply(`Новое настроение установлено: "${mood}"`);
-    bot.removeTextListener(); // Удаляем обработчик, чтобы не перезаписывать настроение случайно
-  });
+bot.command(commands.current, (ctx) => {
+  ctx.reply(`Текущие настройки:\n ${mood}`);
 });
-bot.on("sticker", (ctx) => ctx.reply("👍"));
+bot.command(commands.cancel, (ctx) => {
+  moodChangeInProcess = true;
+  mood = initialMood;
+  ctx.reply(`Настроение сброшено до базовых.\nТекущие настройки:\n ${mood}`);
+  moodChangeInProcess = false;
+});
+bot.command(commands.mood, (ctx) => {
+  ctx.reply("Введите новое настроение для бота:");
+  moodChangeInProcess = true;
+});
+
 bot.on("text", (ctx) => {
+  const userInput = ctx.message.text;
+  const isCommand = Object.values(commands).some(
+    (command) => `/${command}` === userInput,
+  );
+
+  if (isCommand) return;
+
+  if (moodChangeInProcess) {
+    mood = userInput;
+    moodChangeInProcess = false;
+    ctx.reply(`Новое настроение установлено:\n "${mood}"`);
+    return;
+  }
+
   (async function () {
-    const userInput = ctx.message.text;
     console.log(userInput, "input");
 
     const response = await getGroqChatCompletion(userInput);
 
     console.log(response, "response");
-    if (!response) return console.log("No response");
+    if (!response) {
+      console.error("No response");
+      return;
+    }
     ctx.reply(response);
   })();
 });
+
+bot.on("sticker", (ctx) => ctx.reply("👍"));
 
 bot.launch();
 
