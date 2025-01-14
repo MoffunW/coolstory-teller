@@ -38,8 +38,8 @@ const roles = {
 };
 
 const setMessages = (ctx, role, message) => {
-  if (!ctx || !role || !message) {
-    console.error("Required 3 params");
+  if (!role || !message) {
+    console.error("no required params");
     return;
   }
   const cached = ctx.session.messages[role];
@@ -50,9 +50,9 @@ const setMessages = (ctx, role, message) => {
 };
 
 const getMessages = (ctx, role) => {
-  if (!ctx || role) {
-    console.error("Required 3 params");
-    return;
+  if (!role) {
+    console.error("Required role");
+    return [];
   }
   const cached = ctx.session.messages[role];
 
@@ -152,7 +152,7 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
 
-const sixteenMinutes = 1000 * 60 * 16;
+const sixteenMinutes = 1000 * 60 * 14;
 setTimeout(() => {
   job.start();
 }, sixteenMinutes);
