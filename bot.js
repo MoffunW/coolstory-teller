@@ -21,15 +21,15 @@ bot.use((ctx, next) => {
         user: [],
         system: [],
       },
-    }; // Инициализация пустой сессии
+    };
   }
   return next();
 });
 
 const initialMood =
-  "Ты рассказчик бредовых историй, я отправляю тебе текст как начало истории, а ты её продолжаешь в манере нонсенс";
-const getUserMood = (ctx) => ctx.session.mood || initialMood;
-const setUserMood = (ctx, mood) => (ctx.session.mood = mood);
+  "Ты рассказчик смешных историй, я отправляю тебе текст как начало истории, а ты её продолжаешь развивать тему как бы это делал хороший друг";
+const getMood = (ctx) => ctx.session.mood || initialMood;
+const setMood = (ctx, mood) => (ctx.session.mood = mood);
 let moodChangeInProcess = false;
 
 const roles = {
@@ -49,6 +49,11 @@ const setMessages = (ctx, role, message) => {
   if (cached.length > 10) cached.shift();
 };
 
+const clearMessages = (ctx) => {
+  ctx.session.messages[roles.user] = [];
+  ctx.session.messages[roles.system] = [];
+};
+
 const getMessages = (ctx, role) => {
   if (!role) {
     console.error("Required role");
@@ -65,7 +70,7 @@ const getMessages = (ctx, role) => {
 };
 
 async function getGroqChatCompletion(ctx, userInput) {
-  const mood = getUserMood(ctx);
+  const mood = getMood(ctx);
   const cachedUserMessages = getMessages(ctx, roles.user);
   const cachedSystemMessages = getMessages(ctx, roles.system);
   const dialogInOrder = interleaveArrays(
@@ -91,17 +96,17 @@ async function getGroqChatCompletion(ctx, userInput) {
 
     return completion.choices[0]?.message?.content || "Got empty message";
   } catch (error) {
+    ctx.reply("Произошла ошибка в генерации", error);
     console.error(error);
   }
 }
 bot.command("current", (ctx) => {
-  ctx.reply(`Текущие настройки:\n ${getUserMood(ctx)}`);
+  ctx.reply(`Текущие настройки:\n ${getMood(ctx)}`);
 });
 bot.command("cancel", (ctx) => {
-  moodChangeInProcess = true;
-  setUserMood(ctx, initialMood);
+  setMood(ctx, initialMood);
+  clearMessages(ctx);
   ctx.reply(`Настроение сброшено до базовых.\nТекущие настройки:\n ${mood}`);
-  moodChangeInProcess = false;
 });
 bot.command("mood", (ctx) => {
   ctx.reply("Введите новое настроение для бота:");
@@ -114,7 +119,8 @@ bot.on("text", (ctx) => {
   if (userInput.startsWith("/")) return;
 
   if (moodChangeInProcess) {
-    setUserMood(ctx, userInput);
+    setMood(ctx, userInput);
+    clearMessages(ctx);
     moodChangeInProcess = false;
 
     ctx.reply(`Новое настроение установлено:\n "${userInput}"`);
@@ -122,18 +128,18 @@ bot.on("text", (ctx) => {
   }
 
   (async function () {
-    console.log(userInput, "input");
+    console.log("USER INPUT: ", userInput);
 
     const response = await getGroqChatCompletion(ctx, userInput);
 
-    setMessages(ctx, roles.user, userInput);
-
-    console.log(response, "response");
+    console.log("AI RESPONSE: ", response);
     if (!response) {
       console.error("No response");
       return;
     }
     ctx.reply(response);
+
+    setMessages(ctx, roles.user, userInput);
     setMessages(ctx, roles.system, response);
   })();
 });
@@ -152,10 +158,10 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
 
-const sixteenMinutes = 1000 * 60 * 14;
+const fourteenMinutes = 1000 * 60 * 14;
 setTimeout(() => {
   job.start();
-}, sixteenMinutes);
+}, fourteenMinutes);
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
