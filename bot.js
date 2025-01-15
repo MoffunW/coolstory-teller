@@ -2,9 +2,7 @@ require("dotenv").config();
 
 const { Telegraf, session } = require("telegraf");
 const { Groq } = require("groq-sdk");
-const express = require("express");
 const { interleaveArrays } = require("./utils.js");
-const job = require("./cron.js").job;
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -96,7 +94,7 @@ async function getGroqChatCompletion(ctx, userInput) {
 
     return completion.choices[0]?.message?.content || "Got empty message";
   } catch (error) {
-    ctx.reply("Произошла ошибка в генерации", error);
+    ctx.reply("Произошла ошибка в генерации: ", error);
     console.error(error);
   }
 }
@@ -147,21 +145,6 @@ bot.on("text", (ctx) => {
 bot.on("sticker", (ctx) => ctx.reply("👍"));
 
 bot.launch();
-const app = express();
-const port = process.env.PORT || 4000;
-
-app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
-
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
-});
-
-const fourteenMinutes = 1000 * 60 * 14;
-setTimeout(() => {
-  job.start();
-}, fourteenMinutes);
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
